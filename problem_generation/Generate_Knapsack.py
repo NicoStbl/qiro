@@ -41,28 +41,45 @@ class Knapsack(Problem):
         # y_indices are num_items + 1 to num_items + maxWeight
         x_indices = range(1, self.num_items + 1)
         y_indices = range(self.num_items + 1, num_variables + 1)
-        smallest_y = self.num_items + 1
 
         # A(1-2ay+f_Y(a)) diagonal is zero because A-2A+A=0
+        # => not fully, right? Because some elements relate to off and diag elements
         # A*f_y(n)
         for i in y_indices:
-            self.matrixClass.add_diag_element(i, self.A * self.vec_n[i - smallest_y] ** 2)
+            self.matrixClass.add_diag_element(i, -self.A) # A(1-2ay)=A-2A=-A
             for j in y_indices:
                 if i != j:
-                    self.matrixClass.add_off_element(
-                        i, j, 2 * self.A + self.A * self.vec_n[i - smallest_y] * self.vec_n[j - smallest_y]
-                    )
+                    self.matrixClass.add_off_element(i, j, 2 * self.A) # A(1+yaay)=A+A=2A
 
-        # -2n(yw)x
+        # A*ynny
         for i in y_indices:
-            for alpha, x in enumerate(x_indices):
-                self.matrixClass.add_off_element(
-                        i, x, -2 * self.A * self.vec_n[i - smallest_y] * self.weights[alpha]
-                )
+            for j in y_indices:
+                if i != j:
+                    self.matrixClass.add_off_element(i, j, self.A)
+
+        # -2y(nw)x
+        # y perspective
+        for i in y_indices:
+            const_to_added = 0
+            for j in x_indices:
+                const_to_added += self.vec_n[i-self.num_items-1] * self.weights[j - 1]
+            self.matrixClass.add_diag_element(i, -2 * const_to_added)
+
+        # x perspective
+        for j in x_indices:
+            const_to_added = 0
+            for i in y_indices:
+                const_to_added += self.vec_n[i-self.num_items-1] * self.weights[j - 1]
+            self.matrixClass.add_diag_element(j, -2 * const_to_added)
+
+        '''
+        for i in x_indices:
+            self.matrixClass.add_diag_element(i, -2 * self.weights[i - 1])
+        '''
+
 
         # A(f_x(w))
         for i in x_indices:
-            self.matrixClass.add_diag_element(i, self.A * self.weights[i - 1] ** 2)
             for j in x_indices:
                 if i != j:
                     self.matrixClass.add_off_element(i, j, 2 * self.A * self.weights[i - 1] * self.weights[j - 1])
@@ -72,6 +89,9 @@ class Knapsack(Problem):
             self.matrixClass.add_diag_element(x, -self.B * self.values[alpha])
 
         # I think that is not sufficient because it doesnt give any information what x and y is in the matrix
-        self.position_translater = [0] + list(x_indices) + list(y_indices)
+        # only x relevant for now as it represents the items and y only if a certain weight is matched
+        # y might be used to check if solution is valid in the end
+        # todo: check after QIRO implementation if this approach makes sense
+        self.position_translater = [0] + list(x_indices)
 
         return self.matrix
