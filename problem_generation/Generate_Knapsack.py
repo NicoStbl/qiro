@@ -7,7 +7,7 @@ class Knapsack(Problem):
     """Knapsack problem generator."""
 
     def __init__(self, maxWeight, weights, values, seed: int=42, A: int=1, B: int=1):
-        # check if the weights and values are the same length (every object needs both)
+        # check if the weights and values are of the same length (every object needs both)
         if len(weights) != len(values):
             raise ValueError("The number of weights and values should be the same")
 
@@ -22,7 +22,6 @@ class Knapsack(Problem):
         self.position_translater = None
 
         # Pre-compute vectors for ease of matrix operations
-        self.vec_a = np.ones(self.maxWeight)
         self.vec_n = np.arange(1, self.maxWeight + 1)
 
         # Initialize the Hamiltonian matrix
@@ -42,9 +41,6 @@ class Knapsack(Problem):
         x_indices = range(1, self.num_items + 1)
         y_indices = range(self.num_items + 1, num_variables + 1)
 
-        # A(1-2ay+f_Y(a)) diagonal is zero because A-2A+A=0
-        # => not fully, right? Because some elements relate to off and diag elements
-        # A*f_y(n)
         for i in y_indices:
             self.matrixClass.add_diag_element(i, -self.A) # A(1-2ay)=A-2A=-A
             for j in y_indices:
@@ -77,7 +73,6 @@ class Knapsack(Problem):
             self.matrixClass.add_diag_element(i, -2 * self.weights[i - 1])
         '''
 
-
         # A(f_x(w))
         for i in x_indices:
             for j in x_indices:
@@ -92,6 +87,6 @@ class Knapsack(Problem):
         # only x relevant for now as it represents the items and y only if a certain weight is matched
         # y might be used to check if solution is valid in the end
         # todo: check after QIRO implementation if this approach makes sense
-        self.position_translater = [0] + list(x_indices)
+        self.position_translater = [0] + list(x_indices) # + list(y_indices) how to make y relevant or useful?
 
         return self.matrix
