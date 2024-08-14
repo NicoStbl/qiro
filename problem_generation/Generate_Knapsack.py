@@ -18,7 +18,6 @@ class Knapsack(Problem):
         self.num_items = len(weights)
         self.A = A
         self.B = B
-        # todo: how to set the position_translater?
         self.position_translater = None
 
         # Pre-compute vectors for ease of matrix operations
@@ -68,11 +67,6 @@ class Knapsack(Problem):
                 const_to_added += self.vec_n[i-self.num_items-1] * self.weights[j - 1]
             self.matrixClass.add_diag_element(j, -2 * const_to_added)
 
-        '''
-        for i in x_indices:
-            self.matrixClass.add_diag_element(i, -2 * self.weights[i - 1])
-        '''
-
         # A(f_x(w))
         for i in x_indices:
             for j in x_indices:
@@ -83,9 +77,6 @@ class Knapsack(Problem):
         for alpha, x in enumerate(x_indices):
             self.matrixClass.add_diag_element(x, -self.B * self.values[alpha])
 
-        # I think that is not sufficient because it doesnt give any information what x and y is in the matrix
-        # only x relevant for now as it represents the items and y only if a certain weight is matched
-        # y might be used to check if solution is valid in the end
         # todo: check after QIRO implementation if this approach makes sense
         self.position_translater = [0] + list(x_indices) # + list(y_indices) how to make y relevant or useful?
 
