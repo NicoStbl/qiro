@@ -44,7 +44,7 @@ class QIRO_Knapsack(QIRO):
             if self.expectation_values.problem.weights.size == 0:
                 break
 
-        print("Optimization finished. Solution: ", self.solution)
+        print("Optimization finished. Solution: [Index, Weight, Value]", self.solution)
 
     ################################################################################
     # Helper functions.                                                            #
@@ -66,12 +66,13 @@ class QIRO_Knapsack(QIRO):
         index = max_expect_val_location[0] - 1
 
         new_weight = self.expectation_values.problem.maxWeight
+        print("Max expect val sign: ", max_expect_val_sign)
 
         # what is the right direction > or <?
         if max_expect_val_sign < 0:
             # delete item and include to solution
             print("Deleted item and include to solution: ", index, " with weight: ", weights[index], " and value: ", values[index])
-
+            print(self.expectation_values.problem.maxWeight)
             if (weights[index] <= self.expectation_values.problem.maxWeight):
                 # add item to solution
                 self.solution.append([index, weights[index], values[index]])
@@ -79,6 +80,8 @@ class QIRO_Knapsack(QIRO):
         else:
             # delete item but dont add to solution
             index = max_expect_val_location[0] - 1
+            print(self.expectation_values.problem.maxWeight)
+
 
             print("Deleted item and exclude from solution: ", index, " with weight: ", weights[index], " and value: ", values[index])
 
@@ -100,57 +103,60 @@ class QIRO_Knapsack(QIRO):
         index_2 = max_expect_val_location[1] - 1
 
         combined_weight = weights[index_1] + weights[index_2]
+        index_to_remove = None
+        print("Max expect val sign: ", max_expect_val_sign)
 
-        if max_expect_val_sign > 0:
-            if combined_weight <= self.expectation_values.problem.maxWeight:
-                # Add both items if possible
-                print(f"Adding both items {index_1} and {index_2} due to positive correlation.")
-                # Adjust the problem's maxWeight
-                self.problem.maxWeight -= combined_weight
-                self.solution.append([index_1, weights[index_1], values[index_1]])
-                self.solution.append([index_2, weights[index_2], values[index_2]])
+        if max_expect_val_sign < 0 and combined_weight <= self.expectation_values.problem.maxWeight:
+            # Add both items if possible
+            print(f"Adding both items {index_1} and {index_2} due to positive correlation.")
+            # Adjust the problem's maxWeight
+            self.problem.maxWeight -= combined_weight
+            self.solution.append([index_1, weights[index_1], values[index_1]])
+            self.solution.append([index_2, weights[index_2], values[index_2]])
+            print(f"Added items {index_1} and {index_2} to the solution.")
+            '''
             else:
                 # Decide based on some criterion
                 # E.g., select item with the highest value-to-weight ratio
                 # todo decide based on one point correlation
                 # => the item with the more promising one is added to the solution
                 # how to get the one point correlation here? Is that even possible?
-                selected_index = -1
-                if values[index_1] / weights[index_1] > values[index_2] / weights[index_2] and weights[index_1] <= self.expectation_values.problem.maxWeight:
-                    selected_index = index_1
-                elif weights[index_2] <= self.expectation_values.problem.maxWeight:
-                    selected_index = index_2
+                # i dont like the following differentiation
+                
+                # first, just delete both for simplification
 
-                if selected_index == -1: # is that really a good differentiation? Maybe, I should rather consider to introduce a binary variable stating if an item is selected
+                if values[index_1] / weights[index_1] > values[index_2] / weights[index_2] and weights[index_1] <= self.expectation_values.problem.maxWeight:
+                    index_to_remove = index_1
+                elif weights[index_2] <= self.expectation_values.problem.maxWeight:
+                    index_to_remove = index_2
+
+                if index_to_remove == None: # is that really a good differentiation? Maybe, I should rather consider to introduce a binary variable stating if an item is selected
                     pass
 
-                print(f"Adding item {selected_index} and removing the other due to positive correlation.")
-                if weights[selected_index] <= self.expectation_values.problem.maxWeight:
+                print(f"Adding item {index_to_remove} and removing the other due to positive correlation.")
+                if weights[index_to_remove] <= self.expectation_values.problem.maxWeight:
                     # Update maxWeight
-                    self.problem.maxWeight -= weights[selected_index]
+                    self.problem.maxWeight -= weights[index_to_remove]
                 else:
                     # too large to add
+                    # => remove and dont add to solution => continue procedure
                     pass
-
-            weights = np.delete(weights, [index_1, index_2])
-            values = np.delete(values, [index_1, index_2])
+                '''
         else:
+            '''
             # comparison between the two items using the value-to-weight ratio
             if values[index_1] / weights[index_1] < values[index_2] / weights[index_2]:
                 index_to_remove = index_1
             else:
                 index_to_remove = index_2
+            '''
 
-            print(f"Removing item: {index_to_remove} due to negative correlation.")
-            weight = weights[index_to_remove]
-            weights = np.delete(weights, index_to_remove)
-            values = np.delete(values, index_to_remove)
-            if weight <= self.expectation_values.problem.maxWeight:
-                self.problem.maxWeight -= weight
+            print(f"Removing items: {index_1} and {index_2} due to negative correlation.")
 
+        weights = np.delete(weights, [index_1, index_2])
+        values = np.delete(values, [index_1, index_2])
         # Reinitialize problem and expectation values
         self.problem = Knapsack(self.problem.maxWeight, weights, values, self.problem.A, self.problem.B)
-
         self._reinitialize_problem_and_expectation_values(weights, values)
 
     def _reinitialize_problem_and_expectation_values(self, weights, values):
