@@ -29,7 +29,7 @@ class KnapsackSolver:
 
         for i in range(n, 0, -1):
             if dp[i][w] != dp[i - 1][w]:
-                selected_items.append(i - 1)  # Add this item to the list
+                selected_items.append([self.weights[i - 1], self.values[i-1]])  # Add this item to the list
                 w -= self.weights[i - 1]
 
         selected_items.reverse()  # Reverse the list to get the order in which items were added

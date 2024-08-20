@@ -77,7 +77,6 @@ class Knapsack(Problem):
         for alpha, x in enumerate(x_indices):
             self.matrixClass.add_diag_element(x, -self.B * self.values[alpha])
 
-        # todo: check after QIRO implementation if this approach makes sense
-        self.position_translater = [0] + list(x_indices) # + list(y_indices) how to make y relevant or useful?
+        self.position_translater = [0] + list(x_indices)
 
         return self.matrix
