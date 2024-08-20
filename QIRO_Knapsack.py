@@ -30,6 +30,7 @@ class QIRO_Knapsack(QIRO):
             if len(max_expect_val_location) == 1:
                 print(f"single var {max_expect_val_location}. Sign: {max_expect_val_sign}")
                 self.update_single_correlation(max_expect_val_location, max_expect_val_sign)
+
             else:
                 print(f"Correlation {max_expect_val_location}. Sign: {max_expect_val_sign}.")
                 self.update_double_correlation(max_expect_val_location, max_expect_val_sign)
@@ -41,7 +42,8 @@ class QIRO_Knapsack(QIRO):
                 break
 
         optimimal_value = lambda self: sum(sub_arr[2] for sub_arr in self.solution)
-        print("Optimization finished. Solution: [Index, Weight, Value]", self.solution, " with total value: ", optimimal_value(self))
+        optimal_weight = lambda self: sum(sub_arr[1] for sub_arr in self.solution)
+        print("Optimization finished. Solution: [Index, Weight, Value]", self.solution, " with total value: ", optimimal_value(self), " and total weight: ", optimal_weight(self))
 
     ################################################################################
     # Helper functions.                                                            #
@@ -99,6 +101,21 @@ class QIRO_Knapsack(QIRO):
             new_weight = new_weight - combined_weight
             self.solution.append([index_1, weights[index_1], values[index_1]])
             self.solution.append([index_2, weights[index_2], values[index_2]])
+        else:
+            corr_1 = self.expectation_values.expect_val_dict[frozenset({index_1 + 1})]
+            corr_2 = self.expectation_values.expect_val_dict[frozenset({index_2 + 1})]
+
+            if corr_1 > corr_2 and corr_1 > 0 and corr_1 is not None and weights[index_1] <= new_weight:
+                print(f"Including item {index_1} to the solution.")
+
+                new_weight = new_weight - weights[index_1]
+                self.solution.append([index_1, weights[index_1], values[index_1]])
+
+            elif corr_1 < corr_2 and corr_2 > 0 and corr_2 is not None and weights[index_2] <= new_weight:
+                print(f"Including item {index_2} to the solution.")
+
+                new_weight = new_weight - weights[index_2]
+                self.solution.append([index_2, weights[index_2], values[index_2]])
 
         print(f"Removing items: {index_1} and {index_2}.")
 
