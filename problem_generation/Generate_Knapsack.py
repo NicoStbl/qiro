@@ -10,6 +10,8 @@ class Knapsack(Problem):
         # check if the weights and values are of the same length (every object needs both)
         if len(weights) != len(values):
             raise ValueError("The number of weights and values should be the same")
+        if maxWeight < 0:
+            raise ValueError("The maximum weight should be non-negative")
 
         super().__init__(seed=seed)
         self.maxWeight = maxWeight
@@ -20,7 +22,7 @@ class Knapsack(Problem):
         self.B = B
         self.position_translater = None
 
-        # Pre-compute vectors for ease of matrix operations
+        # Pre-compute vector n
         self.vec_n = np.arange(1, self.maxWeight + 1)
 
         # Initialize the Hamiltonian matrix
@@ -28,6 +30,7 @@ class Knapsack(Problem):
 
     def knapsack_to_matrix(self):
         """Constructs the Hamiltonian matrix for the knapsack problem."""
+
         # Total number of variables: items + weights
         num_variables = self.num_items + self.maxWeight
 
@@ -35,47 +38,44 @@ class Knapsack(Problem):
         self.matrixClass = Matrix(num_variables + 1)
         self.matrix = self.matrixClass.matrix
 
-        # x_indices are 1 to num_items
-        # y_indices are num_items + 1 to num_items + maxWeight
         x_indices = range(1, self.num_items + 1)
         y_indices = range(self.num_items + 1, num_variables + 1)
 
         for i in y_indices:
-            self.matrixClass.add_diag_element(i, -self.A) # A(1-2ay)=A-2A=-A
+            self.matrixClass.add_diag_element(i, -self.A) # A * (1 - 2 * a^T y)= A - 2 * A = -A
             for j in y_indices:
                 if i != j:
-                    self.matrixClass.add_off_element(i, j, 2 * self.A) # A(1+yaay)=A+A=2A
+                    self.matrixClass.add_off_element(i, j, 2 * self.A) # A * (1 + y^T (a^T a) y) = A + A = 2 * A
+                else:
+                    self.matrixClass.add_diag_element(j, 2* self.A) # A * (1 + y^T (a^T a) y) = A + A = 2 * A
 
-        # A*ynny
+        # A * y^T (n n^T) y
         for i in y_indices:
             for j in y_indices:
                 if i != j:
-                    self.matrixClass.add_off_element(i, j, self.A)
+                    vec_n_i = self.vec_n[i - (self.num_items + 1)]
+                    vec_n_j = self.vec_n[j - (self.num_items + 1)]
+                    self.matrixClass.add_off_element(i, j, self.A * vec_n_i * vec_n_j)
+                else:
+                    vec_n_j = self.vec_n[j - (self.num_items + 1)]
+                    self.matrixClass.add_diag_element(j, self.A * vec_n_j * vec_n_j)
 
-        # -2y(nw)x
-        # y perspective
+        # -2 * y^T (n w^T) x
         for i in y_indices:
-            const_to_added = 0
             for j in x_indices:
-                const_to_added += self.vec_n[i-self.num_items-1] * self.weights[j - 1]
-            self.matrixClass.add_diag_element(i, -2 * const_to_added)
+                self.matrixClass.add_off_element(i, j, -2 * self.vec_n[i - self.num_items - 1] * self.weights[j - 1])
 
-        # x perspective
-        for j in x_indices:
-            const_to_added = 0
-            for i in y_indices:
-                const_to_added += self.vec_n[i-self.num_items-1] * self.weights[j - 1]
-            self.matrixClass.add_diag_element(j, -2 * const_to_added)
-
-        # A(f_x(w))
+        # A * x^T (w w^T) x
         for i in x_indices:
             for j in x_indices:
                 if i != j:
                     self.matrixClass.add_off_element(i, j, 2 * self.A * self.weights[i - 1] * self.weights[j - 1])
+                else:
+                    self.matrixClass.add_diag_element(i, self.A * self.weights[i - 1] * self.weights[j - 1])
 
         # Construct H_B
-        for alpha, x in enumerate(x_indices):
-            self.matrixClass.add_diag_element(x, -self.B * self.values[alpha])
+        for i, x in enumerate(x_indices):
+            self.matrixClass.add_diag_element(x, -self.B * self.values[i])
 
         self.position_translater = [0] + list(x_indices)
 

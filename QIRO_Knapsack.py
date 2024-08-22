@@ -37,13 +37,17 @@ class QIRO_Knapsack(QIRO):
 
             print("Optimized expectation values: ", max_expect_val_location, " Step: ", step_nr)
 
-            # stop, if no elements left
+            # stop, if no elements left or Weight Constraint Reached
             if self.expectation_values.problem.weights.size == 0 or self.expectation_values.problem.maxWeight == 0:
                 break
 
-        optimimal_value = lambda self: sum(sub_arr[2] for sub_arr in self.solution)
-        optimal_weight = lambda self: sum(sub_arr[1] for sub_arr in self.solution)
-        print("Optimization finished. Solution: [Index, Weight, Value]", self.solution, " with total value: ", optimimal_value(self), " and total weight: ", optimal_weight(self))
+        calculated_value = lambda self: sum(sub_arr[2] for sub_arr in self.solution)
+        calculated_weight = lambda self: sum(sub_arr[1] for sub_arr in self.solution)
+        print(
+            "Optimization finished. Solution: [Index, Weight, Value]", self.solution,
+            " with total value: ", calculated_value(self),
+            " and total weight: ", calculated_weight(self)
+        )
 
     ################################################################################
     # Helper functions.                                                            #
@@ -55,7 +59,7 @@ class QIRO_Knapsack(QIRO):
 
         neg correlation: var. more likely to be 0
         pos correlation: var. more likely to be 1
-        approx. 0 correlation: including var. doesn't affect the optimality of the solution
+        approx. 0 correlation: we don't include the var. because it doesn't affect the optimality of the solution
         """
 
         weights = self.expectation_values.problem.weights
@@ -64,13 +68,20 @@ class QIRO_Knapsack(QIRO):
         index = max_expect_val_location[0] - 1
         new_weight = self.expectation_values.problem.maxWeight
 
-        if max_expect_val_sign > 0 and weights[index] <= new_weight:
+        if (max_expect_val_sign > 0 and weights[index] <= new_weight):
             print("Include item to solution: ", index, " with weight: ", weights[index], " and value: ", values[index])
 
             self.solution.append([index, weights[index], values[index]])
             new_weight = new_weight - weights[index]
 
-        print("Deleting item: ", index, " with weight: ", weights[index], " and value: ", values[index])
+        print(
+            "Deleting item: ", index,
+            " with weight: ", weights[index],
+            " and value: ", values[index]
+        )
+
+        # add functionality that doesn't remove close to 0 correlations
+        # not sure if that brings any benefit
 
         weights = np.delete(weights, index)
         values = np.delete(values, index)
@@ -101,6 +112,9 @@ class QIRO_Knapsack(QIRO):
             new_weight = new_weight - combined_weight
             self.solution.append([index_1, weights[index_1], values[index_1]])
             self.solution.append([index_2, weights[index_2], values[index_2]])
+
+            weights = np.delete(weights, [index_1, index_2])
+            values = np.delete(values, [index_1, index_2])
         else:
             corr_1 = self.expectation_values.expect_val_dict[frozenset({index_1 + 1})]
             corr_2 = self.expectation_values.expect_val_dict[frozenset({index_2 + 1})]
@@ -110,6 +124,8 @@ class QIRO_Knapsack(QIRO):
 
                 new_weight = new_weight - weights[index_1]
                 self.solution.append([index_1, weights[index_1], values[index_1]])
+                weights = np.delete(weights, [index_1])
+                values = np.delete(values, [index_1])
 
             elif corr_1 < corr_2 and corr_2 > 0 and corr_2 is not None and weights[index_2] <= new_weight:
                 print(f"Including item {index_2} to the solution.")
@@ -117,10 +133,16 @@ class QIRO_Knapsack(QIRO):
                 new_weight = new_weight - weights[index_2]
                 self.solution.append([index_2, weights[index_2], values[index_2]])
 
+                weights = np.delete(weights, [index_2])
+                values = np.delete(values, [index_2])
+            else:
+                weights = np.delete(weights, [index_1, index_2])
+                values = np.delete(values, [index_1, index_2])
+
         print(f"Removing items: {index_1} and {index_2}.")
 
-        weights = np.delete(weights, [index_1, index_2])
-        values = np.delete(values, [index_1, index_2])
+        #weights = np.delete(weights, [index_1, index_2])
+        #values = np.delete(values, [index_1, index_2])
 
         print("New weight: ", new_weight)
         self._reinitialize_problem_and_expectation_values(new_weight, weights, values)
