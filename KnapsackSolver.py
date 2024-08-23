@@ -35,3 +35,20 @@ class KnapsackSolver:
         selected_items.reverse()  # Reverse the list to get the order in which items were added
 
         return max_value, selected_items
+
+    def greedy(self):
+        weight = 0
+        value = 0
+        solution = []
+        items = self._orderItemsBasedOnVW()
+        while items[0][0] + weight <= self.maxWeight:
+            weight += items[0][0]
+            value += items[0][1]
+            solution.append(items.pop(0))
+        return value, weight, solution
+
+    def _orderItemsBasedOnVW(self):
+        # Order the items based on the value-to-weight ratio
+        items = [[self.weights[i], self.values[i]] for i in range(len(self.weights))]
+        items.sort(key=lambda x: x[1] / x[0], reverse=True)
+        return items
