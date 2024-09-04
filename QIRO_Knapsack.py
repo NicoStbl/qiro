@@ -18,7 +18,7 @@ class QIRO_Knapsack(QIRO):
         super().__init__(nc=nc_input, expectation_values=expectation_values_input)
         self.solution = None
 
-    def execute(self):
+    def execute_QIRO(self):
         step_nr = 0
         self.solution = []
 
@@ -49,6 +49,129 @@ class QIRO_Knapsack(QIRO):
             " and total weight: ", calculated_weight(self)
         )
 
+
+
+    def execute_greedy(self):
+        self.solution = []
+        maxWeight = self.problem.maxWeight
+
+        # Optimize and retrieve expectation values
+        self.expectation_values.optimize()
+        expectation_values = self.expectation_values.expect_val_dict
+
+        # Sort the expectation values by absolute value (with random tie-breaking)
+        sorted_expectation_values = dict(
+            sorted(expectation_values.items(), key=lambda item: (abs(item[1]), np.random.rand()), reverse=True)
+        )
+
+        # Add the first largest elements (keys) to the solution list
+        for key in sorted_expectation_values:
+            keys = list(key)
+            # only consider one point correlations
+            if len(keys) == 1 and self.problem.weights[keys[0]-1] <= maxWeight:
+                maxWeight -= self.problem.weights[keys[0]-1]
+                index = keys[0] - 1
+                self.solution.append([index, self.problem.weights[index], self.problem.values[index]])
+
+        calculated_value = lambda self: sum(sub_arr[2] for sub_arr in self.solution)
+        calculated_weight = lambda self: sum(sub_arr[1] for sub_arr in self.solution)
+
+        print(
+            "Optimization finished. Solution: [Index, Weight, Value]", self.solution,
+            " with total value: ", calculated_value(self),
+            " and total weight: ", calculated_weight(self)
+        )
+
+    def execute_greedy_with_pruning(self):
+        self.solution = []
+        maxWeight = self.problem.maxWeight
+
+        # Optimize and retrieve expectation values
+        self.expectation_values.optimize()
+        expectation_values = self.expectation_values.expect_val_dict
+
+        # Sort the expectation values by absolute value (with random tie-breaking)
+        sorted_expectation_values = dict(
+            sorted(expectation_values.items(), key=lambda item: (abs(item[1]), np.random.rand()), reverse=True)
+        )
+
+        # Pruning threshold
+        pruning_threshold = 0.05
+
+        for key in sorted_expectation_values:
+            keys = list(key)
+            if len(keys) == 1:
+                item_weight = self.problem.weights[keys[0] - 1]
+                item_value = self.problem.values[keys[0] - 1]
+
+                # Check if the item fits within the remaining capacity
+                if item_weight <= maxWeight:
+                    # Predict the remaining capacity after adding this item
+                    remaining_capacity = maxWeight - item_weight
+
+                    # Determine the maximum value that can be added with the remaining capacity
+                    max_future_value = 0
+                    for future_key in sorted_expectation_values:
+                        future_keys = list(future_key)
+                        if len(future_keys) == 1 and future_key != key:
+                            future_item_weight = self.problem.weights[future_keys[0] - 1]
+                            future_item_value = self.problem.values[future_keys[0] - 1]
+                            if future_item_weight <= remaining_capacity:
+                                max_future_value += future_item_value
+
+                    # Prune the item if including it would result in inefficient use of capacity
+                    if remaining_capacity > 0 and (remaining_capacity / maxWeight) < pruning_threshold:
+                        continue
+
+                    # Include the item if it's not pruned
+                    maxWeight -= item_weight
+                    self.solution.append([keys[0] - 1, item_weight, item_value])
+
+        # Calculate total value and weight of the selected items
+        calculated_value = sum(sub_arr[2] for sub_arr in self.solution)
+        calculated_weight = sum(sub_arr[1] for sub_arr in self.solution)
+
+        print(
+            "Optimization finished. Solution: [Index, Weight, Value]", self.solution,
+            " with total value: ", calculated_value,
+            " and total weight: ", calculated_weight
+        )
+
+    # greedy with correlation to weight ratio
+    def execute_greedy_with_weight_ratio(self):
+        self.solution = []
+        maxWeight = self.problem.maxWeight
+
+        # Optimize and retrieve expectation values
+        self.expectation_values.optimize()
+        expectation_values = self.expectation_values.expect_val_dict
+
+        # Sort the expectation values by the ratio of absolute value to weight (with random tie-breaking)
+        sorted_expectation_values = dict(
+            sorted(expectation_values.items(),
+                   key=lambda item: (abs(item[1]) / self.problem.weights[list(item[0])[0] - 1], np.random.rand()),
+                   reverse=True)
+        )
+
+        # Add the first largest elements (keys) to the solution list
+        for key in sorted_expectation_values:
+            keys = list(key)
+            # Only consider one-point correlations
+            if len(keys) == 1 and self.problem.weights[keys[0] - 1] <= maxWeight:
+                maxWeight -= self.problem.weights[keys[0] - 1]
+                index = keys[0] - 1
+                self.solution.append([index, self.problem.weights[index], self.problem.values[index]])
+
+        calculated_value = lambda self: sum(sub_arr[2] for sub_arr in self.solution)
+        calculated_weight = lambda self: sum(sub_arr[1] for sub_arr in self.solution)
+
+        print(
+            "Optimization finished. Solution: [Index, Weight, Value]", self.solution,
+            " with total value: ", calculated_value(self),
+            " and total weight: ", calculated_weight(self)
+        )
+        return calculated_value(self), calculated_weight(self), self.solution
+
     ################################################################################
     # Helper functions.                                                            #
     ################################################################################
@@ -68,7 +191,7 @@ class QIRO_Knapsack(QIRO):
         index = max_expect_val_location[0] - 1
         new_weight = self.expectation_values.problem.maxWeight
 
-        if (max_expect_val_sign > 0 and weights[index] <= new_weight):
+        if max_expect_val_sign > 0 and weights[index] <= new_weight:
             print("Include item to solution: ", index, " with weight: ", weights[index], " and value: ", values[index])
 
             self.solution.append([index, weights[index], values[index]])
