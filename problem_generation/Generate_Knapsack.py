@@ -15,9 +15,8 @@ class Knapsack(Problem):
 
         super().__init__(seed=seed)
         self.maxWeight = maxWeight
-        self.weights = np.array(weights)
-        self.values = np.array(values)
-        self.num_items = len(weights)
+        self.weights, self.values = self.prune_knapsack(maxWeight, weights, values)
+        self.num_items = len(self.weights)
         self.A = A
         self.B = B
         self.position_translater = None
@@ -32,7 +31,7 @@ class Knapsack(Problem):
         """Constructs the Hamiltonian matrix for the knapsack problem."""
 
         # Total number of variables: items + weights
-        num_variables = self.num_items + self.maxWeight
+        num_variables = self.num_items #+ self.maxWeight
 
         # Create the matrix class
         self.matrixClass = Matrix(num_variables + 1)
@@ -80,3 +79,10 @@ class Knapsack(Problem):
         self.position_translater = [0] + list(x_indices)
 
         return self.matrix
+
+    def prune_knapsack(self, max_weight, weights, values):
+        """Prune the knapsack problem by removing items that are too heavy."""
+        indices_to_remove = np.where(weights > max_weight)[0]
+        weights = np.delete(weights, indices_to_remove)
+        values = np.delete(values, indices_to_remove)
+        return weights, values
