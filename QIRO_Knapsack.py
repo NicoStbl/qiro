@@ -14,10 +14,14 @@ class QIRO_Knapsack(QIRO):
     of a dictionary as well as a list of optimal parameters from each elimination step
     """
 
-    def __init__(self, nc_input, expectation_values_input, variation="QIRO"):
+    def __init__(self, nc_input, expectation_values_input, variation="MINQ"):
         super().__init__(nc=nc_input, expectation_values=expectation_values_input)
         self.solution = None
         self.variation = variation
+
+        if self.variation not in ['QIRO', 'MINQ', 'MAXQ', 'MMQ']:
+            raise ValueError("Invalid variation type")
+
 
     def execute(self):
         step_nr = 0
@@ -33,11 +37,7 @@ class QIRO_Knapsack(QIRO):
                     if len(key) == 2:
                         del self.expectation_values.expect_val_dict[key]
 
-            if self.variation == 'QIRO':
-                sorted_correlation_dict = sorted(self.expectation_values.expect_val_dict.items(),
-                                                 key=lambda item: (abs(item[1]), np.random.rand()), reverse=True)
-
-            if self.variation == 'MINQ':
+            if self.variation == 'QIRO' or self.variation == 'MINQ' or self.variation == 'MMQ':
                 # Ties are broken randomly
                 sorted_correlation_dict = sorted(self.expectation_values.expect_val_dict.items(),
                                                  key=lambda item: (item[1], np.random.rand()), reverse=True)
@@ -45,13 +45,10 @@ class QIRO_Knapsack(QIRO):
             if self.variation == 'MAXQ':
                 # Ties are broken randomly
                 sorted_correlation_dict = sorted(self.expectation_values.expect_val_dict.items(),
-                                                 key=lambda item: (item[1], np.random.rand()))
+                                                 key=lambda item: (item[1], np.random.rand()), reverse=False)
 
-            if self.variation == 'MMQ':
-                # Ties are broken randomly
-                sorted_correlation_dict = sorted(self.expectation_values.expect_val_dict.items(),
-                                                 key=lambda item: (abs(item[1]), np.random.rand()), reverse=True)
 
+            print("Sorted Correlation Dictionary: ", sorted_correlation_dict)
             max_expect_val_location, max_expect_val = sorted_correlation_dict[0]
 
             if self.variation in ['QIRO', 'MMQ']:
@@ -60,16 +57,19 @@ class QIRO_Knapsack(QIRO):
                 max_expect_val_sign = +1
             elif self.variation == 'MAXQ':
                 max_expect_val_sign = -1
+            else:
+                raise ValueError("Invalid variation type")
 
             if len(max_expect_val_location) == 1:
                 print(f"single var {max_expect_val_location}. Sign: {max_expect_val_sign}")
-                self.update_single_correlation(list(max_expect_val_location), max_expect_val_sign)
+                self.update_single_correlation(list(max_expect_val_location), max_expect_val_sign, max_expect_val)
 
             else:
                 print(f"Correlation {max_expect_val_location}. Sign: {max_expect_val_sign}.")
                 self.update_double_correlation(list(max_expect_val_location), max_expect_val_sign)
 
             print("Optimized expectation values: ", max_expect_val_location, " Step: ", step_nr)
+            print(self.solution)
 
             # stop, if no elements left or Weight Constraint Reached
             if self.expectation_values.problem.weights.size == 0 or self.expectation_values.problem.maxWeight == 0:
@@ -77,6 +77,7 @@ class QIRO_Knapsack(QIRO):
 
         calculated_value = lambda self: sum(sub_arr[2] for sub_arr in self.solution)
         calculated_weight = lambda self: sum(sub_arr[1] for sub_arr in self.solution)
+
         print(
             "Optimization finished. Solution: [Index, Weight, Value]", self.solution,
             " with total value: ", calculated_value(self),
@@ -88,12 +89,12 @@ class QIRO_Knapsack(QIRO):
     # Helper functions.                                                            #
     ################################################################################
 
-    def update_single_correlation(self, max_expect_val_location, max_expect_val_sign):
+    def update_single_correlation(self, max_expect_val_location, max_expect_val_sign, max_expect_val):
         """
         Updates Hamiltonian according to one-point correlations
 
-        neg correlation: var. more likely to be 0
-        pos correlation: var. more likely to be 1
+        neg. correlation: var. more likely to be 0
+        pos. correlation: var. more likely to be 1
         approx. 0 correlation: we don't include the var. because it doesn't affect the optimality of the solution
         """
 
@@ -103,7 +104,9 @@ class QIRO_Knapsack(QIRO):
         index = max_expect_val_location[0] - 1
         new_weight = self.expectation_values.problem.maxWeight
 
-        if max_expect_val_sign > 0:
+        print("Current Index: ", index)
+
+        if max_expect_val_sign > 0 or max_expect_val >= 0:
             print("Include item to solution: ", index, " with weight: ", weights[index], " and value: ", values[index])
 
             self.solution.append([index, weights[index], values[index]])
@@ -121,14 +124,14 @@ class QIRO_Knapsack(QIRO):
         print("New weight: ", new_weight)
 
         self._reinitialize_problem_and_expectation_values(new_weight, weights, values)
-        return True
+
 
     def update_double_correlation(self, max_expect_val_location, max_expect_val_sign):
         """
         Updates Hamiltonian according to two-point correlations
 
-        neg correlation: including one item makes it less likely to include the other regarding optimality
-        pos correlation: including one item makes it more likely to include the other regarding optimality
+        neg. correlation: including one item makes it less likely to include the other regarding optimality
+        pos. correlation: including one item makes it more likely to include the other regarding optimality
         approx. 0 correlation: including one item doesn't affect the optimality of including the other
         """
 
@@ -138,55 +141,58 @@ class QIRO_Knapsack(QIRO):
         index_1 = max_expect_val_location[0] - 1
         index_2 = max_expect_val_location[1] - 1
 
-        # merge items
+        # add larger correlation item to the solution
         if max_expect_val_sign > 0:
-            print(f"Merging items {index_1} and {index_2}.")
+            corr_1 = self.expectation_values.expect_val_dict[frozenset({index_1 + 1})]
+            corr_2 = self.expectation_values.expect_val_dict[frozenset({index_2 + 1})]
+            new_weight = 0
+            index_adjustment = 0
 
-            new_weight = weights[index_1] + weights[index_2]
-            new_value = values[index_1] + values[index_2]
-
-            weights = np.delete(weights, [index_1, index_2])
-            weights = np.append(weights, new_weight)
-            values = np.delete(values, [index_1, index_2])
-            values = np.append(values, new_value)
-
-            self._reinitialize_problem_and_expectation_values(self.problem.maxWeight, weights, values)
-            return False
-
-        # delete one item
-        else:
-            if frozenset({index_1 + 1}) in self.expectation_values.expect_val_dict:
-                corr_1 = self.expectation_values.expect_val_dict[frozenset({index_1 + 1})]
-            else:
-                corr_1 = None
-
-            if frozenset({index_2 + 1}) in self.expectation_values.expect_val_dict:
-                corr_2 = self.expectation_values.expect_val_dict[frozenset({index_2 + 1})]
-            else:
-                corr_2 = None
-
-            if corr_1 is not None and corr_1 > corr_2 and corr_1 > 0:
-                print(f"Including item {index_1} to the next step. Exclude item {index_2}.")
-                weights = np.delete(weights, [index_2])
-                values = np.delete(values, [index_2])
-                self._reinitialize_problem_and_expectation_values(self.problem.maxWeight, weights, values)
-                return True
-
-            elif corr_2 is not None and corr_1 < corr_2 and corr_2 > 0:
-                print(f"Including item {index_2} to the next step. Exclude item {index_1}.")
+            if corr_1 > 0:
+                print(f"Adding item {index_1} to the solution.")
+                new_weight += weights[index_1]
+                self.solution.append([index_1, weights[index_1], values[index_1]])
                 weights = np.delete(weights, [index_1])
                 values = np.delete(values, [index_1])
-                self._reinitialize_problem_and_expectation_values(self.problem.maxWeight, weights, values)
-                return True
+                index_adjustment = 1
 
-        print(f"Neither item {index_1} nor item {index_2} is included in the next step.")
-        weights = np.delete(weights, [index_1, index_2])
-        values = np.delete(values, [index_1, index_2])
-        self._reinitialize_problem_and_expectation_values(self.problem.maxWeight, weights, values)
-        return False
+            if corr_2 > 0:
+                print(f"Adding item {index_2} to the solution.")
+                self.solution.append([index_2, weights[index_2 - index_adjustment], values[index_2 - index_adjustment]])
+                new_weight += weights[index_2 - index_adjustment]
+                weights = np.delete(weights, [index_2 - index_adjustment])
+                values = np.delete(values, [index_2 - index_adjustment])
+
+            self._reinitialize_problem_and_expectation_values(self.problem.maxWeight-new_weight, weights, values)
+
+        # delete lower correlation item
+        else:
+            corr_1 = self.expectation_values.expect_val_dict[frozenset({index_1 + 1})]
+            corr_2 = self.expectation_values.expect_val_dict[frozenset({index_2 + 1})]
+            deleted_weight = 0
+            index_adjustment = 0
+
+            if corr_1 < 0:
+                # delete corr 1 item
+                print(f"Exclude item {index_1} from problem.")
+                deleted_weight += weights[index_1]
+                index_adjustment = 1
+                weights = np.delete(weights, [index_1])
+                values = np.delete(values, [index_1])
+
+            if corr_2 < 0:
+                # delete corr 2 item
+                print(f"Exclude item {index_2} from problem.")
+                deleted_weight += weights[index_2 - index_adjustment]
+                weights = np.delete(weights, [index_2 - index_adjustment])
+                values = np.delete(values, [index_2 - index_adjustment])
+
+            self._reinitialize_problem_and_expectation_values(self.problem.maxWeight - deleted_weight, weights, values)
+
 
     def _reinitialize_problem_and_expectation_values(self, new_weight, weights, values):
         """Reinitializes the problem and expectation values based on the updated weights and values."""
+
         self.problem = Knapsack(new_weight, weights, values, self.problem.A, self.problem.B)
 
         if self.expectation_values.type == "SingleLayerQAOAExpectationValueKnapsack":
@@ -197,12 +203,6 @@ class QIRO_Knapsack(QIRO):
         elif self.expectation_values.type == "StateVecQAOAExpectationValues":
             self.expectation_values = StateVecQAOAExpectationValues(self.problem, self.expectation_values.p)
 
-    def prune_knapsack(self, max_weight, weights, values):
-        """Prune the knapsack problem by removing items that are too heavy."""
-        indices_to_remove = np.where(weights > max_weight)[0]
-        weights = np.delete(weights, indices_to_remove)
-        values = np.delete(values, indices_to_remove)
-        return weights, values
 
     ################################################################################
     # Other Approaches.                                                            #
@@ -238,6 +238,7 @@ class QIRO_Knapsack(QIRO):
             " with total value: ", calculated_value(self),
             " and total weight: ", calculated_weight(self)
         )
+
 
     def execute_greedy_with_pruning(self):
         self.solution = []
@@ -293,6 +294,7 @@ class QIRO_Knapsack(QIRO):
             " with total value: ", calculated_value,
             " and total weight: ", calculated_weight
         )
+
 
     # greedy with correlation to weight ratio
     # dumb approach

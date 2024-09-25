@@ -62,7 +62,7 @@ class Knapsack(Problem):
         # -2 * y^T (n w^T) x
         for i in y_indices:
             for j in x_indices:
-                self.matrixClass.add_off_element(i, j, -2 * self.vec_n[i - self.num_items - 1] * self.weights[j - 1])
+                self.matrixClass.add_off_element(j, j, -2 * self.vec_n[i - self.num_items - 1] * self.weights[j - 1])
 
         # A * x^T (w w^T) x
         for i in x_indices:
