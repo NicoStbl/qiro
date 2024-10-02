@@ -5,7 +5,7 @@ from pennylane import numpy as np
 
 
 class StateVecQAOAExpectationValues(ExpectationValues):
-    
+
     # initialization
     def __init__(self, problem, p, device="default.qubit", num_opts=1, num_opt_steps=50):
         super().__init__(problem)
@@ -26,7 +26,7 @@ class StateVecQAOAExpectationValues(ExpectationValues):
 
     def optimize(self, verbose=False):
         opt = qml.GradientDescentOptimizer()
-    
+
         for retry in range(self.num_opts):
             parameters = self.qaoa_parameters
             if retry > 0:
@@ -35,7 +35,7 @@ class StateVecQAOAExpectationValues(ExpectationValues):
                 parameters = opt.step(self._cost_function, parameters)
                 if (i + 1) % 5 == 0 and verbose:
                     print("Cost after step {:5d}: {: .7f}".format(i + 1, self._cost_function(parameters)))
-        
+
             # if verbose:
             print(f"Optimization run {retry + 1} finished.")
             if retry == 0:
@@ -56,26 +56,23 @@ class StateVecQAOAExpectationValues(ExpectationValues):
         def _calc_exp_val():
             self._circuit(self.qaoa_parameters)
             return [qml.expval(op) for op in operators_list]
-        
+
         exp_val = np.array(_calc_exp_val())
         # find max correlation, break ties at random
         max_correlation = np.max(np.abs(exp_val))
         max_correlation_indices = np.where(np.abs(exp_val) == max_correlation)[0]
         max_correlation_index = np.random.choice(max_correlation_indices)
-        
+
+        # todo: make sure indices_list has a maximum length of position translater
         translated_mci = [self.problem.position_translater[i] for i in indices_list[max_correlation_index]]
 
         self.expect_val_dict = {}
         print(indices_list)
-    
+
         for i, key in enumerate(operator_dict.keys()):
             self.expect_val_dict[key] = float(exp_val[i])
-    
+
         return translated_mci, int(np.sign(exp_val[max_correlation_index])), float(max_correlation)
-        
-
-
-
 
     def _qaoa_layer(self, gamma, beta):
         qml.qaoa.cost_layer(gamma, self.cost_h)
@@ -86,26 +83,27 @@ class StateVecQAOAExpectationValues(ExpectationValues):
             qml.Hadamard(wires=w)
         qml.layer(self._qaoa_layer, self.p, parameters[:, 0], parameters[:, 1])
 
-    
     def _cost_function(self, parameters):
 
         @qml.qnode(self.dev)
         def __cost_function():
             self._circuit(parameters)
             return qml.expval(self.cost_h)
-        
+
         return __cost_function()
 
     def _get_expval_operator_dict(self):
         """
         Returns a list of PauliZ operators for each qubit.
         """
+
+        # todo look if position translater can be encoded here
         expval_operator_dict = {}
-        for i in range(1, self.problem.matrix.shape[0]):
-            for j in range(1, self.problem.matrix.shape[1]):
+        for i in range(1, len(self.problem.position_translater)):
+            for j in range(1, len(self.problem.position_translater)):
                 if self.problem.matrix[i, j] != 0:
                     if i == j:
-                        expval_operator_dict[frozenset({i})] = qml.PauliZ(i - 1) 
-                    else:   
+                        expval_operator_dict[frozenset({i})] = qml.PauliZ(i - 1)
+                    else:
                         expval_operator_dict[frozenset({i, j})] = qml.PauliZ(i - 1) @ qml.PauliZ(j - 1)
         return expval_operator_dict

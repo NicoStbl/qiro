@@ -10,8 +10,6 @@ class Knapsack(Problem):
         # check if the weights and values are of the same length (every object needs both)
         if len(weights) != len(values):
             raise ValueError("The number of weights and values should be the same")
-        if maxWeight < 0:
-            raise ValueError("The maximum weight should be non-negative")
 
         super().__init__(seed=seed)
         self.maxWeight = maxWeight
@@ -31,7 +29,7 @@ class Knapsack(Problem):
         """Constructs the Hamiltonian matrix for the knapsack problem."""
 
         # Total number of variables: items + weights
-        num_variables = self.num_items #+ self.maxWeight
+        num_variables = self.num_items + self.maxWeight
 
         # Create the matrix class
         self.matrixClass = Matrix(num_variables + 1)
@@ -86,3 +84,27 @@ class Knapsack(Problem):
         weights = np.delete(weights, indices_to_remove)
         values = np.delete(values, indices_to_remove)
         return weights, values
+
+
+    def evaluate_solution(self, solution):
+        """
+        Evaluates a solution to the knapsack problem.
+
+        :param solution: A binary array indicating which items are selected (1 for selected, 0 for not selected)
+        :return: Total value of the selected items if weight constraint is satisfied, else 0 or a penalty.
+        """
+
+        # Check if solution length matches the number of items
+        if len(solution) != self.num_items:
+            raise ValueError("Solution length must be equal to the number of items.")
+
+        # Calculate the total weight and value of the selected items
+        total_weight = np.dot(solution, self.weights)
+        total_value = np.dot(solution, self.values)
+
+        # If the total weight exceeds the knapsack capacity, return a penalty (e.g., 0)
+        if total_weight > self.maxWeight:
+            return 0  # Or any penalty value, such as -(total_weight - self.maxWeight) if you want to penalize excess
+
+        # Otherwise, return the total value of the selected items
+        return total_value

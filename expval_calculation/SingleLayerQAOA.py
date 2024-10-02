@@ -4,7 +4,6 @@ from scipy.optimize import fsolve
 from expval_calculation.ExpVal import ExpectationValues
 from problem_generation.Generating_Problems import Problem
 
-
 class SingleLayerQAOAExpectationValues(ExpectationValues):
     """
     :param problem: input problem
@@ -141,6 +140,9 @@ class SingleLayerQAOAExpectationValues(ExpectationValues):
         lb = self.gamma - (np.pi / (steps - 1))
         ub = self.gamma + (np.pi / (steps - 1))
         self._calc_best_gamma(lb=lb, ub=ub, steps=steps)
+
+        landscape_data = [self.gamma, self.beta, self.energy]
+
         # computing the correlatios at the optimal parameters
         (
             max_expect_val_location,
@@ -151,7 +153,7 @@ class SingleLayerQAOAExpectationValues(ExpectationValues):
             [max_expect_val_location, max_expect_val_sign, max_expect_val]
         )
 
-        return max_expect_val_location, max_expect_val_sign, max_expect_val
+        return max_expect_val_location, max_expect_val_sign, max_expect_val, landscape_data
 
     ####################################################################################
     # Beginning of block with helper functions that calculate the numerics.            #
@@ -354,7 +356,7 @@ class SingleLayerQAOAExpectationValues(ExpectationValues):
         beta = float(fsolve(__f, 0.01, xtol=0.000001))
         energy = (
             self.a * np.sin(2 * beta)
-            + self.b * np.sin(4 * beta)
+            + self.b * np.sin(4 * beta) # we need to make sure that pi periodicity is taken into account
             - self.c * ((np.sin(2 * beta)) ** 2)
         )
 
@@ -398,13 +400,45 @@ class SingleLayerQAOAExpectationValues(ExpectationValues):
 
     def _calc_best_gamma(self, lb=0, ub=np.pi, steps=30):
         """Calculates best angles in a 30 points grid between a lower and upper bound"""
+
+        landscape = []
         for gamma in np.linspace(lb, ub, steps):
             beta, energy = self._calc_beta_energy(gamma)
-
+            landscape.append([gamma, beta, energy])
             if energy < self.energy:
                 self.gamma = gamma
                 self.beta = beta
                 self.energy = energy
+        self.visualize_landscape(landscape)
+
+    def visualize_landscape(self, landscape):
+        """Visualizes the landscape using a 2D scatter plot."""
+        import matplotlib.pyplot as plt
+
+        # Convert the landscape data to a NumPy array for easier manipulation
+        landscape = np.array(landscape)
+
+        # Extract gamma, beta, and energy values
+        gamma = landscape[:, 0]
+        beta = landscape[:, 1]
+        energy = landscape[:, 2]
+
+        # Create a scatter plot
+        plt.figure(figsize=(8, 6))
+        sc = plt.scatter(gamma, beta, c=energy, cmap='viridis', marker='o')
+
+        # Add a color bar to show energy levels
+        plt.colorbar(sc, label='Energy')
+
+        # Label axes
+        plt.xlabel('Gamma')
+        plt.ylabel('Beta')
+
+        # Add a title
+        plt.title('Quantum Energy Landscape')
+
+        # Show the plot
+        plt.show()
 
     ####################################################################################
     # Ending of block with helper functions to optimize the parameters                 #

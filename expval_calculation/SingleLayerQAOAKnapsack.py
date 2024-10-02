@@ -23,7 +23,7 @@ class SingleLayerQAOAExpectationValuesKnapsack(SingleLayerQAOAExpectationValues)
     def calc_expect_val(self) -> (list, int, float):
         """Calculate all one- and two-point correlation expectation values and return the one with highest absolute value."""
 
-        # ensure that it is only consisting of x and not y because y is only there to ensure that it is a valid solution
+        # get rid of slack variables (Y)
 
         # initialize dictionary for saving the correlations
         self.expect_val_dict = {}
@@ -68,7 +68,7 @@ class SingleLayerQAOAExpectationValuesKnapsack(SingleLayerQAOAExpectationValues)
                         index_small=index_small,
                     )
                     ZZ = (
-                        np.sin(4 * self.beta) * b_part_term
+                        2*np.sin(4 * self.beta) * b_part_term
                         - ((np.sin(2 * self.beta)) ** 2) * c_part_term
                     )
                     self.expect_val_dict[frozenset({index_large, index_small})] = ZZ

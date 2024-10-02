@@ -2,8 +2,10 @@ from QIRO import QIRO
 from expval_calculation.SingleLayerQAOAKnapsack import SingleLayerQAOAExpectationValuesKnapsack
 from expval_calculation.SingleLayerQAOA import SingleLayerQAOAExpectationValues
 from expval_calculation.StateVecQAOA import StateVecQAOAExpectationValues
+from expval_calculation.StateVecQAOAKnapsack import StateVecQAOAExpectationValuesKnapsack
 from problem_generation.Generate_Knapsack import Knapsack
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class QIRO_Knapsack(QIRO):
@@ -23,14 +25,17 @@ class QIRO_Knapsack(QIRO):
             raise ValueError("Invalid variation type")
 
 
+
     def execute(self):
         step_nr = 0
         self.solution = []
 
-        while self.expectation_values.problem.maxWeight >= np.min(self.expectation_values.problem.weights):
+        while self.expectation_values.problem.weights.size != 0 and self.expectation_values.problem.maxWeight > 0 \
+                and self.expectation_values.problem.maxWeight >= np.min(self.expectation_values.problem.weights):
             step_nr += 1
 
             self.expectation_values.optimize()
+
 
             if self.variation == "MINQ" or self.variation == "MAXQ" or self.variation == "MMQ":
                 for key in self.expectation_values.expect_val_dict.copy().keys():
@@ -47,8 +52,6 @@ class QIRO_Knapsack(QIRO):
                 sorted_correlation_dict = sorted(self.expectation_values.expect_val_dict.items(),
                                                  key=lambda item: (item[1], np.random.rand()), reverse=False)
 
-
-            print("Sorted Correlation Dictionary: ", sorted_correlation_dict)
             max_expect_val_location, max_expect_val = sorted_correlation_dict[0]
 
             if self.variation in ['QIRO', 'MMQ']:
@@ -69,11 +72,6 @@ class QIRO_Knapsack(QIRO):
                 self.update_double_correlation(list(max_expect_val_location), max_expect_val_sign)
 
             print("Optimized expectation values: ", max_expect_val_location, " Step: ", step_nr)
-            print(self.solution)
-
-            # stop, if no elements left or Weight Constraint Reached
-            if self.expectation_values.problem.weights.size == 0 or self.expectation_values.problem.maxWeight == 0:
-                break
 
         calculated_value = lambda self: sum(sub_arr[2] for sub_arr in self.solution)
         calculated_weight = lambda self: sum(sub_arr[1] for sub_arr in self.solution)
@@ -106,7 +104,7 @@ class QIRO_Knapsack(QIRO):
 
         print("Current Index: ", index)
 
-        if max_expect_val_sign > 0 or max_expect_val >= 0:
+        if max_expect_val_sign > 0 or max_expect_val > 0:
             print("Include item to solution: ", index, " with weight: ", weights[index], " and value: ", values[index])
 
             self.solution.append([index, weights[index], values[index]])
@@ -142,13 +140,13 @@ class QIRO_Knapsack(QIRO):
         index_2 = max_expect_val_location[1] - 1
 
         # add larger correlation item to the solution
-        if max_expect_val_sign > 0:
+        if max_expect_val_sign >= 0:
             corr_1 = self.expectation_values.expect_val_dict[frozenset({index_1 + 1})]
             corr_2 = self.expectation_values.expect_val_dict[frozenset({index_2 + 1})]
             new_weight = 0
             index_adjustment = 0
 
-            if corr_1 > 0:
+            if corr_1 >= 0 and weights[index_1] <= self.problem.maxWeight:
                 print(f"Adding item {index_1} to the solution.")
                 new_weight += weights[index_1]
                 self.solution.append([index_1, weights[index_1], values[index_1]])
@@ -156,7 +154,7 @@ class QIRO_Knapsack(QIRO):
                 values = np.delete(values, [index_1])
                 index_adjustment = 1
 
-            if corr_2 > 0:
+            if corr_2 >= 0 and new_weight + weights[index_2 - index_adjustment] <= self.problem.maxWeight:
                 print(f"Adding item {index_2} to the solution.")
                 self.solution.append([index_2, weights[index_2 - index_adjustment], values[index_2 - index_adjustment]])
                 new_weight += weights[index_2 - index_adjustment]
@@ -193,15 +191,12 @@ class QIRO_Knapsack(QIRO):
     def _reinitialize_problem_and_expectation_values(self, new_weight, weights, values):
         """Reinitializes the problem and expectation values based on the updated weights and values."""
 
-        self.problem = Knapsack(new_weight, weights, values, self.problem.A, self.problem.B)
+        self.expectation_values.problem = Knapsack(new_weight, weights, values, self.problem.A, self.problem.B)
 
         if self.expectation_values.type == "SingleLayerQAOAExpectationValueKnapsack":
-            self.expectation_values = SingleLayerQAOAExpectationValuesKnapsack(self.problem)
-        elif self.expectation_values.type == "SingleLayerQAOAExpectationValue":
-            self.expectation_values = SingleLayerQAOAExpectationValues(self.problem, self.expectation_values.gamma,
-                                                                       self.expectation_values.beta)
-        elif self.expectation_values.type == "StateVecQAOAExpectationValues":
-            self.expectation_values = StateVecQAOAExpectationValues(self.problem, self.expectation_values.p)
+            self.expectation_values = SingleLayerQAOAExpectationValuesKnapsack(self.expectation_values.problem)
+        elif self.expectation_values.type == "StateVecQAOAExpectationValuesKnapsack":
+            self.expectation_values = StateVecQAOAExpectationValuesKnapsack(self.expectation_values.problem, self.expectation_values.p)
 
 
     ################################################################################
