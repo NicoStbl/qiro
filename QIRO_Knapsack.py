@@ -63,13 +63,15 @@ class QIRO_Knapsack(QIRO):
             else:
                 raise ValueError("Invalid variation type")
 
+            print("Sorted correlation dict: ", sorted_correlation_dict)
+
             if len(max_expect_val_location) == 1:
                 print(f"single var {max_expect_val_location}. Sign: {max_expect_val_sign}")
-                self.update_single_correlation(list(max_expect_val_location), max_expect_val_sign, max_expect_val)
+                self._update_single_correlation(list(max_expect_val_location), max_expect_val_sign, max_expect_val)
 
             else:
                 print(f"Correlation {max_expect_val_location}. Sign: {max_expect_val_sign}.")
-                self.update_double_correlation(list(max_expect_val_location), max_expect_val_sign)
+                self._update_double_correlation(list(max_expect_val_location), max_expect_val_sign)
 
             print("Optimized expectation values: ", max_expect_val_location, " Step: ", step_nr)
 
@@ -87,7 +89,7 @@ class QIRO_Knapsack(QIRO):
     # Helper functions.                                                            #
     ################################################################################
 
-    def update_single_correlation(self, max_expect_val_location, max_expect_val_sign, max_expect_val):
+    def _update_single_correlation(self, max_expect_val_location, max_expect_val_sign, max_expect_val):
         """
         Updates Hamiltonian according to one-point correlations
 
@@ -124,7 +126,7 @@ class QIRO_Knapsack(QIRO):
         self._reinitialize_problem_and_expectation_values(new_weight, weights, values)
 
 
-    def update_double_correlation(self, max_expect_val_location, max_expect_val_sign):
+    def _update_double_correlation(self, max_expect_val_location, max_expect_val_sign):
         """
         Updates Hamiltonian according to two-point correlations
 
@@ -146,7 +148,7 @@ class QIRO_Knapsack(QIRO):
             new_weight = 0
             index_adjustment = 0
 
-            if corr_1 >= 0 and weights[index_1] <= self.problem.maxWeight:
+            if corr_1 > corr_2 and weights[index_1] <= self.problem.maxWeight:
                 print(f"Adding item {index_1} to the solution.")
                 new_weight += weights[index_1]
                 self.solution.append([index_1, weights[index_1], values[index_1]])
@@ -154,7 +156,7 @@ class QIRO_Knapsack(QIRO):
                 values = np.delete(values, [index_1])
                 index_adjustment = 1
 
-            if corr_2 >= 0 and new_weight + weights[index_2 - index_adjustment] <= self.problem.maxWeight:
+            if corr_2 >= corr_1 and new_weight + weights[index_2 - index_adjustment] <= self.problem.maxWeight:
                 print(f"Adding item {index_2} to the solution.")
                 self.solution.append([index_2, weights[index_2 - index_adjustment], values[index_2 - index_adjustment]])
                 new_weight += weights[index_2 - index_adjustment]
@@ -170,7 +172,7 @@ class QIRO_Knapsack(QIRO):
             deleted_weight = 0
             index_adjustment = 0
 
-            if corr_1 < 0:
+            if corr_1 < corr_2:
                 # delete corr 1 item
                 print(f"Exclude item {index_1} from problem.")
                 deleted_weight += weights[index_1]
@@ -178,7 +180,7 @@ class QIRO_Knapsack(QIRO):
                 weights = np.delete(weights, [index_1])
                 values = np.delete(values, [index_1])
 
-            if corr_2 < 0:
+            if corr_2 <= corr_1:
                 # delete corr 2 item
                 print(f"Exclude item {index_2} from problem.")
                 deleted_weight += weights[index_2 - index_adjustment]
@@ -200,7 +202,7 @@ class QIRO_Knapsack(QIRO):
 
 
     ################################################################################
-    # Other Approaches.                                                            #
+    # Other Approaches. Deprecated!                                                #
     ################################################################################
 
     def execute_greedy(self):

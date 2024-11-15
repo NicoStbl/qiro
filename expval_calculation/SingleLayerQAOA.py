@@ -409,7 +409,7 @@ class SingleLayerQAOAExpectationValues(ExpectationValues):
                 self.gamma = gamma
                 self.beta = beta
                 self.energy = energy
-        self.visualize_landscape(landscape)
+        #self.visualize_landscape(landscape)
 
     def visualize_landscape(self, landscape):
         """Visualizes the landscape using a 2D scatter plot."""
